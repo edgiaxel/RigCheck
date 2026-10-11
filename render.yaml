@@ -2,7 +2,7 @@ services:
   - type: web
     name: rigcheck-frontend
     runtime: static
-    buildCommand: cd frontend && npm install && npm run build
+    buildCommand: npm run build
     staticPublishPath: ./frontend/dist
     headers:
       - path: /*

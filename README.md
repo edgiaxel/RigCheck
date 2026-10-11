@@ -266,12 +266,13 @@ You can also host the frontend on Render while keeping the backend and Ollama on
 ### 1. Render Static Site Settings
 - **Repository**: Connected to your GitHub repository (`RigCheck`).
 - **Runtime**: Static Site.
-- **Build Command**: `cd frontend && npm install && npm run build` (or root `npm run build`).
-- **Publish Directory**: `frontend/dist`.
+- **Build Command**: `npm run build` (or `./build.sh`).
+  *(Note: Render's UI may auto-suggest `pip install -r requirements.txt` if it detects Python files—ensure Build Command is set to `npm run build` or leave blank as our root `package.json` auto-compiles the frontend during `postinstall`)*.
+- **Publish Directory**: `frontend/dist`
 - **Environment Variables**:
-  - `VITE_API_BASE_URL`: *(Optional)* Set to your active Cloudflare Tunnel URL (e.g., `https://xyz.trycloudflare.com`).
+  - `VITE_API_BASE_URL`: *(Optional)* Set to your active Cloudflare Tunnel URL (e.g., `https://xyz.trycloudflare.com`). Can also be pasted dynamically at runtime on mobile.
 
-*(Or simply deploy using the included `render.yaml` Blueprint file)*.
+*(Or deploy using the included `render.yaml` Blueprint file via **New -> Blueprint**)*.
 
 ### 2. Connecting Render to Your Local Backend
 1. Open your Render site (e.g. `https://rigcheck-frontend.onrender.com`) on your phone or PC.
