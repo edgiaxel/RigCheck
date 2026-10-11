@@ -45,6 +45,18 @@ export function getSessionToken(): string | null {
  */
 export function getApiBaseUrl(): string {
   try {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const qApi = params.get('api');
+      if (qApi && qApi.trim()) {
+        let clean = qApi.trim().replace(/\/+$/, '');
+        if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+          clean = `https://${clean}`;
+        }
+        localStorage.setItem('rigcheck_api_base_url', clean);
+        return clean;
+      }
+    }
     const custom = localStorage.getItem('rigcheck_api_base_url');
     if (custom && custom.trim()) {
       return custom.trim().replace(/\/+$/, '');
@@ -59,7 +71,11 @@ export function getApiBaseUrl(): string {
 export function setApiBaseUrl(url: string | null): void {
   try {
     if (url && url.trim()) {
-      localStorage.setItem('rigcheck_api_base_url', url.trim().replace(/\/+$/, ''));
+      let clean = url.trim().replace(/\/+$/, '');
+      if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+        clean = `https://${clean}`;
+      }
+      localStorage.setItem('rigcheck_api_base_url', clean);
     } else {
       localStorage.removeItem('rigcheck_api_base_url');
     }
@@ -75,12 +91,7 @@ export function resolveUrl(path: string): string {
 }
 
 function getAuthHeaders(): HeadersInit {
-  const headers: Record<string, string> = {};
-  if (inMemoryToken) {
-    headers['Authorization'] = `Bearer ${inMemoryToken}`;
-    headers['X-RigCheck-Token'] = inMemoryToken;
-  }
-  return headers;
+  return {};
 }
 
 async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
@@ -88,7 +99,7 @@ async function parseErrorMessage(res: Response, fallback: string): Promise<strin
     const text = await res.text();
     if (!text || !text.trim()) {
       if (res.status === 404 || res.status === 405) {
-        return 'Backend endpoint not found (HTTP 404/405). If running from Render, please configure your active Cloudflare Tunnel URL below.';
+        return 'Backend endpoint not found (HTTP 404/405). Please configure your active Cloudflare Tunnel URL.';
       }
       return `${fallback} (HTTP ${res.status})`;
     }
@@ -98,7 +109,7 @@ async function parseErrorMessage(res: Response, fallback: string): Promise<strin
     } catch {
       if (text.includes('<!DOCTYPE') || text.includes('<html')) {
         return res.status === 404 || res.status === 405
-          ? 'Backend endpoint not reachable on static host. Please configure your active Cloudflare Tunnel URL below.'
+          ? 'Backend endpoint not reachable on static host. Please configure your active Cloudflare Tunnel URL.'
           : `${fallback} (HTTP ${res.status})`;
       }
       return text.length < 300 ? text : fallback;
@@ -109,17 +120,7 @@ async function parseErrorMessage(res: Response, fallback: string): Promise<strin
 }
 
 export async function checkAuthStatus(): Promise<boolean> {
-  try {
-    const res = await fetch(resolveUrl('/api/auth/status'), {
-      credentials: 'include',
-      headers: getAuthHeaders(),
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    return Boolean(data.authenticated);
-  } catch {
-    return false;
-  }
+  return true;
 }
 
 export async function loginWithSecret(secret: string): Promise<string> {

@@ -8,8 +8,7 @@ interface HeaderProps {
   health: BackendHealth | null;
   profile: UserProfile | null;
   hasAnalysis: boolean;
-  isAuthenticated: boolean;
-  onLogout: () => void;
+  onToggleConnection: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -18,8 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   health,
   profile,
   hasAnalysis,
-  isAuthenticated,
-  onLogout,
+  onToggleConnection,
 }) => {
   const isOllamaOnline = health?.ollama?.available ?? false;
 
@@ -82,31 +80,24 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
 
-        {getApiBaseUrl() && (
-          <div className="telemetry-chip hidden-mobile" title={`Backend Tunnel: ${getApiBaseUrl()}`}>
-            <span className="material-symbols-outlined text-[15px] text-primary">cloud_sync</span>
-            <span style={{ fontSize: '0.7rem' }}>Tunnel</span>
-          </div>
-        )}
-
         <div className="telemetry-chip" title="Local Inference Engine Status">
           <span className={`pulse-dot ${isOllamaOnline ? 'pulse-dot-green' : 'pulse-dot-amber'}`} />
           <span style={{ fontSize: '0.7rem' }}>
-            {isOllamaOnline ? 'Ollama: Ready' : 'Connecting...'}
+            {isOllamaOnline ? 'Ollama: Ready' : (health ? 'Connecting...' : 'PC Offline')}
           </span>
         </div>
 
-        {isAuthenticated && (
-          <button
-            onClick={onLogout}
-            className="telemetry-chip"
-            title="Lock Station (Sign Out)"
-            style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
-          >
-            <span className="material-symbols-outlined text-[16px] text-primary">lock_open</span>
-            <span style={{ fontSize: '0.7rem' }}>Lock</span>
-          </button>
-        )}
+        <button
+          onClick={onToggleConnection}
+          className="telemetry-chip"
+          title="Configure PC Connection (Cloudflare Tunnel URL)"
+          style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
+        >
+          <span className="material-symbols-outlined text-[16px] text-primary">settings_ethernet</span>
+          <span style={{ fontSize: '0.7rem' }}>
+            {getApiBaseUrl() ? 'Tunnel URL' : 'Connect PC'}
+          </span>
+        </button>
       </div>
     </header>
   );

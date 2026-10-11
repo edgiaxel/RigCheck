@@ -48,10 +48,10 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 
 
-# Restrict CORS to localhost, loopback, Cloudflare tunnel, and Render domains
+# Permissive CORS allowing cross-origin requests from Render and mobile browsers
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.trycloudflare\.com|.*\.onrender\.com)(:[0-9]+)?$",
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

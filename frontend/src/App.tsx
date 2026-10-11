@@ -1,59 +1,100 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import type { AnalysisResponse, BackendHealth, UserProfile } from './types';
-import { checkAuthStatus, fetchHealth, fetchProfile, logout } from './services/api';
+import { fetchHealth, fetchProfile, getApiBaseUrl, setApiBaseUrl } from './services/api';
 import { Header } from './components/Header';
 import { ScannerView } from './components/ScannerView';
 import { ResultsView } from './components/ResultsView';
 import { ProfileView } from './components/ProfileView';
 import { HistoryView } from './components/HistoryView';
-import { AuthModal } from './components/AuthModal';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('scanner');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [health, setHealth] = useState<BackendHealth | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [latestAnalysis, setLatestAnalysis] = useState<AnalysisResponse | null>(null);
   const [sessionAnalyses, setSessionAnalyses] = useState<AnalysisResponse[]>([]);
   const [initError, setInitError] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const isRemoteStaticHost = typeof window !== 'undefined' &&
+    !['localhost', '127.0.0.1'].includes(window.location.hostname) &&
+    !window.location.hostname.endsWith('.trycloudflare.com');
+
+  const [apiUrlInput, setApiUrlInput] = useState<string>(getApiBaseUrl());
+  const [showConnectionBar, setShowConnectionBar] = useState<boolean>(
+    Boolean(isRemoteStaticHost && !getApiBaseUrl())
+  );
+  const [isConnecting, setIsConnecting] = useState<boolean>(false);
+
+  const loadData = useCallback(async () => {
     try {
       const [healthData, profileData] = await Promise.all([
         fetchHealth().catch(() => null),
         fetchProfile().catch(() => null),
       ]);
-      if (healthData) setHealth(healthData);
-      if (profileData) setProfile(profileData);
-      setInitError(null);
-    } catch {
-      setInitError('Could not load station profile data.');
+      if (healthData) {
+        setHealth(healthData);
+        setInitError(null);
+      } else {
+        setHealth(null);
+        if (isRemoteStaticHost && !getApiBaseUrl()) {
+          setInitError('Backend not connected. Paste your PC Cloudflare Tunnel URL above.');
+        } else {
+          setInitError('Could not reach PC backend. Check if your Cloudflare tunnel and backend are running.');
+        }
+      }
+      if (profileData) {
+        setProfile(profileData);
+      }
+    } catch (err: any) {
+      setInitError(err.message || 'Could not load station profile data.');
     }
-  };
+  }, [isRemoteStaticHost]);
 
   useEffect(() => {
-    // Check initial auth status
-    const initAuth = async () => {
-      const authed = await checkAuthStatus();
-      setIsAuthenticated(authed);
-      if (authed) {
-        await loadData();
+    let ignore = false;
+    Promise.all([
+      fetchHealth().catch(() => null),
+      fetchProfile().catch(() => null),
+    ]).then(([healthData, profileData]) => {
+      if (ignore) return;
+      if (healthData) {
+        setHealth(healthData);
+        setInitError(null);
+      } else {
+        setHealth(null);
+        if (isRemoteStaticHost && !getApiBaseUrl()) {
+          setInitError('Backend not connected. Paste your PC Cloudflare Tunnel URL above.');
+        } else {
+          setInitError('Could not reach PC backend. Check if your Cloudflare tunnel and backend are running.');
+        }
       }
+      if (profileData) {
+        setProfile(profileData);
+      }
+    }).catch((err: any) => {
+      if (!ignore) {
+        setInitError(err.message || 'Could not load station profile data.');
+      }
+    });
+
+    return () => {
+      ignore = true;
     };
+  }, [isRemoteStaticHost]);
 
-    initAuth();
-  }, []);
-
-  const handleAuthSuccess = async () => {
-    setIsAuthenticated(true);
+  const handleConnect = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsConnecting(true);
+    setInitError(null);
+    let target = apiUrlInput.trim();
+    if (target && !target.startsWith('http://') && !target.startsWith('https://')) {
+      target = `https://${target}`;
+      setApiUrlInput(target);
+    }
+    setApiBaseUrl(target || null);
     await loadData();
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    setIsAuthenticated(false);
-    setProfile(null);
+    setIsConnecting(false);
   };
 
   const handleAnalysisSuccess = (result: AnalysisResponse) => {
@@ -75,13 +116,49 @@ export const App: React.FC = () => {
         health={health}
         profile={profile}
         hasAnalysis={latestAnalysis !== null}
-        isAuthenticated={Boolean(isAuthenticated)}
-        onLogout={handleLogout}
+        onToggleConnection={() => setShowConnectionBar(!showConnectionBar)}
       />
 
-      {/* Access Verification Modal when station is locked */}
-      {isAuthenticated === false && (
-        <AuthModal onSuccess={handleAuthSuccess} />
+      {/* Connection Bar (Render cross-origin bridge to local PC) */}
+      {(showConnectionBar || (isRemoteStaticHost && !health)) && (
+        <form onSubmit={handleConnect} className="connection-panel">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span className="material-symbols-outlined text-[18px] text-primary">cloud_sync</span>
+            <span style={{ fontWeight: 600, fontSize: '0.78rem' }}>
+              PC Backend Tunnel URL:
+            </span>
+          </div>
+          <input
+            type="url"
+            className="form-input"
+            style={{ maxWidth: '340px', fontSize: '0.78rem', padding: '0.4rem 0.6rem' }}
+            placeholder="https://xxxx.trycloudflare.com (empty for local)"
+            value={apiUrlInput}
+            onChange={(e) => setApiUrlInput(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="btn btn-primary"
+            style={{ padding: '0.4rem 0.85rem', fontSize: '0.78rem' }}
+            disabled={isConnecting}
+          >
+            {isConnecting ? 'Connecting...' : (health ? 'Update URL' : 'Connect to PC')}
+          </button>
+          {getApiBaseUrl() && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}
+              onClick={() => {
+                setApiUrlInput('');
+                setApiBaseUrl(null);
+                loadData();
+              }}
+            >
+              Reset to Local
+            </button>
+          )}
+        </form>
       )}
 
       {/* Main Content Area */}
