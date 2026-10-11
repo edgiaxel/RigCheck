@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: rigcheck-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: "" # Set to your Cloudflare Quick Tunnel URL (e.g., https://xyz.trycloudflare.com). If omitted, configure dynamically at runtime in the web interface.
