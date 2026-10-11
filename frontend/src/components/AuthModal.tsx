@@ -10,29 +10,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
   const [showSecret, setShowSecret] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const isRemoteStaticHost = typeof window !== 'undefined' &&
+    !['localhost', '127.0.0.1'].includes(window.location.hostname) &&
+    !window.location.hostname.endsWith('.trycloudflare.com');
+
   const [apiUrl, setApiUrl] = useState<string>(getApiBaseUrl());
-  const [showConnectionConfig, setShowConnectionConfig] = useState<boolean>(Boolean(getApiBaseUrl()));
+  const [showConnectionConfig, setShowConnectionConfig] = useState<boolean>(
+    Boolean(getApiBaseUrl()) || isRemoteStaticHost
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!secret.trim()) {
+    const trimmedSecret = secret.trim();
+    if (!trimmedSecret) {
       setErrorMessage('Please enter the access secret.');
       return;
+    }
+
+    let targetApiUrl = apiUrl.trim();
+    if (isRemoteStaticHost && !targetApiUrl) {
+      setShowConnectionConfig(true);
+      setErrorMessage('Please paste your active Cloudflare Tunnel URL below to connect this Render site to your PC backend.');
+      return;
+    }
+
+    if (targetApiUrl && !targetApiUrl.startsWith('http://') && !targetApiUrl.startsWith('https://')) {
+      targetApiUrl = `https://${targetApiUrl}`;
+      setApiUrl(targetApiUrl);
     }
 
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      // Save custom API base URL if adjusted
-      setApiBaseUrl(apiUrl.trim() || null);
-      await loginWithSecret(secret.trim());
+      setApiBaseUrl(targetApiUrl || null);
+      await loginWithSecret(trimmedSecret);
       onSuccess();
     } catch (err: any) {
       if (err instanceof ApiError) {
         setErrorMessage(err.detail);
       } else {
-        setErrorMessage(err.message || 'Authentication failed. Please verify your secret.');
+        setErrorMessage(err.message || 'Authentication failed. Please verify your secret and tunnel URL.');
       }
     } finally {
       setIsLoading(false);
@@ -170,6 +189,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                   gap: '0.35rem',
                 }}
               >
+                {isRemoteStaticHost && !apiUrl && (
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: 'var(--color-text)',
+                      backgroundColor: 'var(--color-primary-subtle)',
+                      border: '1px solid var(--color-primary)',
+                      padding: '0.45rem 0.6rem',
+                      borderRadius: 'var(--radius-sm)',
+                      marginBottom: '0.3rem',
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    <strong>Render Static Site Notice:</strong> Paste your PC's active Cloudflare Tunnel URL below so requests connect to your local backend.
+                  </div>
+                )}
+
                 <label
                   htmlFor="backend-api-url"
                   style={{
@@ -180,9 +216,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                     justifyContent: 'space-between',
                   }}
                 >
-                  <span>Backend Tunnel URL</span>
+                  <span>Backend Tunnel URL {isRemoteStaticHost && <strong style={{ color: 'var(--color-primary)' }}>(Required on Render)</strong>}</span>
                   <span style={{ fontSize: '0.68rem', color: 'var(--color-text-subtle)' }}>
-                    {apiUrl ? 'Cross-Origin' : 'Default (/api)'}
+                    {apiUrl ? 'Cross-Origin' : (isRemoteStaticHost ? 'Not Connected' : 'Default (/api)')}
                   </span>
                 </label>
                 <input
@@ -190,13 +226,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                   type="url"
                   className="form-input"
                   style={{ fontSize: '0.78rem', padding: '0.4rem 0.6rem' }}
-                  placeholder="https://xxxx.trycloudflare.com (empty for local /api)"
+                  placeholder={isRemoteStaticHost ? "https://xxxx.trycloudflare.com" : "https://xxxx.trycloudflare.com (empty for local /api)"}
                   value={apiUrl}
                   onChange={(e) => setApiUrl(e.target.value)}
                   disabled={isLoading}
                 />
                 <div style={{ fontSize: '0.68rem', color: 'var(--color-text-subtle)', lineHeight: 1.3 }}>
-                  Use this when RigCheck frontend is deployed on Render to route requests to your PC's Cloudflare Tunnel.
+                  Your local terminal command <code>cloudflared tunnel --url http://127.0.0.1:8000</code> generates this URL.
                 </div>
               </div>
             )}

@@ -83,6 +83,31 @@ function getAuthHeaders(): HeadersInit {
   return headers;
 }
 
+async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const text = await res.text();
+    if (!text || !text.trim()) {
+      if (res.status === 404 || res.status === 405) {
+        return 'Backend endpoint not found (HTTP 404/405). If running from Render, please configure your active Cloudflare Tunnel URL below.';
+      }
+      return `${fallback} (HTTP ${res.status})`;
+    }
+    try {
+      const data = JSON.parse(text);
+      return data.detail || data.message || fallback;
+    } catch {
+      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+        return res.status === 404 || res.status === 405
+          ? 'Backend endpoint not reachable on static host. Please configure your active Cloudflare Tunnel URL below.'
+          : `${fallback} (HTTP ${res.status})`;
+      }
+      return text.length < 300 ? text : fallback;
+    }
+  } catch {
+    return `${fallback} (HTTP ${res.status})`;
+  }
+}
+
 export async function checkAuthStatus(): Promise<boolean> {
   try {
     const res = await fetch(resolveUrl('/api/auth/status'), {
@@ -98,23 +123,25 @@ export async function checkAuthStatus(): Promise<boolean> {
 }
 
 export async function loginWithSecret(secret: string): Promise<string> {
-  const res = await fetch(resolveUrl('/api/auth/login'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'include',
-    body: JSON.stringify({ secret }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(resolveUrl('/api/auth/login'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ secret }),
+    });
+  } catch (netErr: any) {
+    throw new ApiError(
+      0,
+      `Cannot connect to backend: ${netErr.message || 'Network error'}. Check if your Cloudflare Tunnel is running and accessible.`
+    );
+  }
 
   if (!res.ok) {
-    let detail = 'Authentication failed';
-    try {
-      const err = await res.json();
-      detail = err.detail || detail;
-    } catch {
-      detail = await res.text() || detail;
-    }
+    const detail = await parseErrorMessage(res, 'Authentication failed');
     throw new ApiError(res.status, detail);
   }
 
@@ -142,8 +169,8 @@ export async function fetchHealth(): Promise<BackendHealth> {
     headers: getAuthHeaders(),
   });
   if (!res.ok) {
-    const errorText = await res.text();
-    throw new ApiError(res.status, errorText || 'Failed to reach health endpoint');
+    const errorText = await parseErrorMessage(res, 'Failed to reach health endpoint');
+    throw new ApiError(res.status, errorText);
   }
   return res.json();
 }
@@ -154,8 +181,8 @@ export async function fetchProfile(): Promise<UserProfile> {
     headers: getAuthHeaders(),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Failed to load profile' }));
-    throw new ApiError(res.status, err.detail || 'Failed to load profile');
+    const errDetail = await parseErrorMessage(res, 'Failed to load profile');
+    throw new ApiError(res.status, errDetail);
   }
   return res.json();
 }
@@ -173,8 +200,8 @@ export async function saveProfile(profile: UserProfile): Promise<UserProfile> {
     body: JSON.stringify(profile),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Failed to update profile' }));
-    throw new ApiError(res.status, err.detail || 'Failed to update profile');
+    const errDetail = await parseErrorMessage(res, 'Failed to update profile');
+    throw new ApiError(res.status, errDetail);
   }
   return res.json();
 }
@@ -199,13 +226,7 @@ export async function analyzeComponent(
   });
 
   if (!res.ok) {
-    let errorDetail = 'Analysis request failed';
-    try {
-      const errJson = await res.json();
-      errorDetail = errJson.detail || errorDetail;
-    } catch {
-      errorDetail = await res.text() || errorDetail;
-    }
+    const errorDetail = await parseErrorMessage(res, 'Analysis request failed');
     throw new ApiError(res.status, errorDetail);
   }
 
