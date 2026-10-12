@@ -114,7 +114,6 @@ RigCheck evaluates hardware rules deterministically and outputs a 3-state verdic
 ## Directory Structure
 
 ```
-/home/axel/Development/RigCheck/
 ├── app/
 │   ├── __init__.py
 │   ├── config.py              # Configuration settings, access secret, session TTL & lockout
@@ -195,7 +194,6 @@ Configure your local `.env` file (copied from `.env.example`). **Never commit `.
 
 ### 2. Backend Installation
 ```bash
-cd /home/axel/Development/RigCheck
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -205,7 +203,6 @@ cp .env.example .env
 
 ### 3. Frontend Build
 ```bash
-cd /home/axel/Development/RigCheck/frontend
 npm install
 npm run build
 ```
@@ -218,7 +215,6 @@ ollama serve
 
 In Terminal 2 (FastAPI Backend + Frontend SPA):
 ```bash
-cd /home/axel/Development/RigCheck
 source .venv/bin/activate
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
@@ -325,16 +321,6 @@ Follow this checklist to demonstrate RigCheck for evaluators or judges:
   - Compatibility check cards with clear **PASS**, **WARN**, or **FAIL** badges.
   - Budget evaluation vs. user profile.
 - [ ] **7. Lock / Sign Out**: Tap the **Lock** button in the header. Verify the session is revoked and protected endpoints return to locked state.
-
----
-
-## Recommended Screenshots for DEV Submission
-
-1. **Mobile Station Locked Screen**: Demonstrates access control and security design on a phone viewport.
-2. **Scanner View on Mobile Phone**: Displays the camera capture interface, file selection fallback, price input, and search toggle.
-3. **Compatibility Report Card**: Shows a complete evaluation report with overall verdict, PSU check pass, and budget evaluation.
-4. **Desktop Profile Canvas**: Displays the Warm Industrial Drafting interface showing CPU, Motherboard, GPU, PSU, and Budget settings.
-5. **Terminal / Inference Telemetry**: Shows local Ollama vision execution (`gemma3:4b`) running on the host machine without external cloud dependencies.
 
 ---
 
